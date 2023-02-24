@@ -1,9 +1,8 @@
-import { MenuItem } from './entities/menu-item.entity';
+import { MenuItem } from "./entities/menu-item.entity";
 import { Repository } from "typeorm";
 import App from "../../app";
 
 export class MenuItemsService {
-
   private menuItemRepository: Repository<MenuItem>;
 
   constructor(app: App) {
@@ -86,6 +85,32 @@ export class MenuItemsService {
   */
 
   async getMenuItems() {
-    throw new Error('TODO in task 3');
+    try {
+      const menuItems: [MenuItem] = await this.menuItemRepository.query(`
+      WITH RECURSIVE menu_tree AS (
+        SELECT id, name, url, parent_id, created_at, CAST(NULL AS INTEGER[]) AS path
+        FROM menu_item
+        WHERE parent_id IS NULL
+        UNION ALL
+        SELECT m.id, m.name, m.url, m.parent_id, m.created_at, path || m.id
+        FROM menu_item m
+        JOIN menu_tree t ON m.parent_id = t.id
+        WHERE NOT m.id = ANY(path)
+      )
+      SELECT id, name, url, parent_id, created_at
+      FROM menu_tree
+      ORDER BY path
+    `);
+
+      const rootMenuItems = menuItems.filter((mi) => mi.parentId === null);
+      const nestedMenuItems = rootMenuItems.map((mi) => {
+        const children = menuItems.filter((c) => c.parentId === mi.id);
+        return { ...mi, children };
+      });
+
+      return nestedMenuItems;
+    } catch (error) {
+      throw new Error("TODO in task 3", error.message);
+    }
   }
 }
